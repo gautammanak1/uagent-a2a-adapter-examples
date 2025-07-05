@@ -1,0 +1,5 @@
+{
+    "api_key": "OPENAI_API_KEY",
+    "model_name": "gpt-4o-mini",
+    "base_url": null
+  }
