@@ -17,7 +17,7 @@ class CodingAgentExecutor(AgentExecutor):
     
     def __init__(self):
         self.url = "https://api.asi1.ai/v1/chat/completions"
-        self.api_key = "sk_5822be6c948d4a25830382b308f6f51ee13629ffe6fc4dc7a064cc26e486df84"
+        self.api_key = "sk_5822be6c948d4a25830382b308f6f51ee13629ffe6fc4dc7a064cc26e486d"
         self.model = "asi1-mini"
         self.headers = {
             'Content-Type': 'application/json',

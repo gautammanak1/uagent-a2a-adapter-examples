@@ -1,24 +1,31 @@
 import os
 import json
-import requests
+import logging
 from typing import Dict, Any
 from dotenv import load_dotenv
+import httpx
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.types import Part, TextPart
 from a2a.utils import new_agent_text_message
 from typing_extensions import override
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Load environment variables
 load_dotenv()
 
 class ResearchAgentExecutor(AgentExecutor):
     """Research agent that specializes in information gathering and analysis."""
-    
+
     def __init__(self):
-        self.url = "https://api.asi1.ai/v1/chat/completions"
-        self.api_key = "sk_5822be6c948d4a25830382b308f6f51ee13629ffe6fc4dc7a064cc26e486df84"
-        self.model = "asi1-mini"
+        self.url = os.getenv("ASI1_API_URL", "https://api.asi1.ai/v1/chat/completions")
+        self.api_key = os.getenv("ASI1_API_KEY")
+        if not self.api_key:
+            raise ValueError("ASI1_API_KEY environment variable is not set")
+        self.model = os.getenv("ASI1_MODEL", "asi1-mini")
         self.headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -40,8 +47,9 @@ Always structure your responses with:
 - Sources/References (when applicable)
 
 Be thorough, accurate, and professional in your research approach.
-        """
-    
+"""
+        self.http_client = httpx.AsyncClient(timeout=30.0)  # 30-second timeout
+
     @override
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         message_content = ""
@@ -49,9 +57,9 @@ Be thorough, accurate, and professional in your research approach.
             if isinstance(part, Part) and isinstance(part.root, TextPart):
                 message_content = part.root.text
                 break
-        
+
         try:
-            payload = json.dumps({
+            payload = {
                 "model": self.model,
                 "messages": [
                     {"role": "system", "content": self.system_prompt},
@@ -60,12 +68,14 @@ Be thorough, accurate, and professional in your research approach.
                 "max_tokens": 1500,
                 "temperature": 0.3,
                 "stream": False
-            })
-            
-            response = requests.post(self.url, headers=self.headers, data=payload)
+            }
+
+            logger.info(f"Sending request to {self.url} with payload: {json.dumps(payload, indent=2)}")
+            response = await self.http_client.post(self.url, headers=self.headers, json=payload)
+            logger.info(f"Received response: {response.status_code}")
             response.raise_for_status()
             research_result = response.json()['choices'][0]['message']['content']
-            
+
             formatted_response = f"""🔍 Research Agent Analysis
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 Query: {message_content}
@@ -73,15 +83,17 @@ Be thorough, accurate, and professional in your research approach.
 {research_result}
 
 ✅ Research completed by AI Research Specialist
-            """
-            
+"""
+
             await event_queue.enqueue_event(new_agent_text_message(formatted_response))
-            
+
         except Exception as e:
-            await event_queue.enqueue_event(
-                new_agent_text_message(f"❌ Research error: {str(e)}")
-            )
-    
+            logger.error(f"Research error: {e}", exc_info=True)
+            await event_queue.enqueue_event(new_agent_text_message(f"❌ Research error: {str(e)}"))
+
     @override
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         await event_queue.enqueue_event(new_agent_text_message("Research cancelled."))
+
+    async def close(self):
+        await self.http_client.aclose()  # Clean up HTTP client
