@@ -1,8 +1,12 @@
-import asyncio, threading, time
+import asyncio
+import threading
+import time
 from typing import Dict, List
 from dataclasses import dataclass
 from uagent_a2a_adapter import A2AAdapter, A2AAgentConfig
-from examples.travel.agent import TripPlannerAgentExecutor
+
+from brave.agent import BraveSearchAgentExecutor
+
 
 @dataclass
 class AgentConfig:
@@ -24,15 +28,15 @@ class SingleAgent:
         print("🔧 Setting up A2A SingleAgent System\n" + "=" * 60)
         self.agent_configs = [
             AgentConfig(
-                name="trip_planner",
-                description="AI Trip Planner powered by A2A GPT-4",
+                name="brave_search",
+                description="AI Search Agent powered by Brave Search API",
                 port=8100,
                 a2a_port=10020,
-                specialties=["trip planning", "itinerary creation", "destination recommendations", "travel tips", "budget planning"],
-                executor_class="TripPlannerAgentExecutor"
+                specialties=["web search", "local search", "information retrieval", "news search", "business lookup"],
+                executor_class="BraveSearchAgentExecutor"
             ),
         ]
-        self.executors = { "TripPlannerAgentExecutor": TripPlannerAgentExecutor() }
+        self.executors = { "BraveSearchAgentExecutor": BraveSearchAgentExecutor() }
         for config in self.agent_configs:
             print(f"✅ {config.name}: {', '.join(config.specialties)}")
 
@@ -50,7 +54,7 @@ class SingleAgent:
                     name=config.name.replace("_", " ").title(),
                     description=config.description,
                     tags=config.specialties,
-                    examples=[f"Help with {s.lower()}" for s in config.specialties[:3]],
+                    examples=[f"Search for {s.lower()}" for s in config.specialties[:3]],
                 )
                 agent_card = AgentCard(
                     name=config.name.replace("_", " ").title(),
@@ -62,7 +66,10 @@ class SingleAgent:
                     capabilities=AgentCapabilities(),
                     skills=[skill],
                 )
-                server = A2AStarletteApplication(agent_card=agent_card, http_handler=DefaultRequestHandler(agent_executor=executor, task_store=InMemoryTaskStore()))
+                server = A2AStarletteApplication(
+                    agent_card=agent_card,
+                    http_handler=DefaultRequestHandler(agent_executor=executor, task_store=InMemoryTaskStore())
+                )
                 print(f"🚀 Starting {config.name} on port {config.a2a_port}")
                 uvicorn.run(server.build(), host="0.0.0.0", port=config.a2a_port, timeout_keep_alive=10, log_level="info")
             except Exception as e:
@@ -84,12 +91,12 @@ class SingleAgent:
                 url=f"http://localhost:{c.a2a_port}",
                 port=c.a2a_port,
                 specialties=c.specialties,
-                priority=3 if "research" in c.specialties or "coding" in c.specialties else 2
+                priority=2
             ) for c in self.agent_configs
         ]
         self.coordinator = A2AAdapter(
-            name="travel_planner",
-            description="Routes queries to AI specialists",
+            name="brave_search_coordinator",
+            description="Routes queries to Brave Search AI specialists",
             port=8200,
             mailbox=True,
             agent_configs=a2a_configs,
@@ -124,12 +131,12 @@ class SingleAgent:
         print(f"\n🌐 Coordinator Address: {self.coordinator.uagent.address}")
         print(f"📡 Port: {self.coordinator.port}")
 
-def create_openai_agent_system():
+def create_brave_search_agent_system():
     return SingleAgent()
 
 def main():
     try:
-        system = create_openai_agent_system()
+        system = create_brave_search_agent_system()
         system.start_system()
     except KeyboardInterrupt:
         print("\n👋 Shutdown complete!")

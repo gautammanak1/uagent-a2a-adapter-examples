@@ -3,7 +3,7 @@ import threading
 import time
 from typing import Dict, List
 from dataclasses import dataclass
-from adpter import A2AAdapter, A2AAgentConfig
+from uagent_a2a_adapter import A2AAdapter, A2AAgentConfig
 from agents.research_agent import ResearchAgentExecutor
 from agents.coding_agent import CodingAgentExecutor
 from agents.analysis_agent import AnalysisAgentExecutor
